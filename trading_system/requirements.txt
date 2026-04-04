@@ -28,3 +28,7 @@ txaio==23.1.1
 typing_extensions==4.13.2
 uvicorn==0.34.2
 zope.interface==7.2
+dj-database-url==2.3.0
+whitenoise==6.8.2
+gunicorn==23.0.0
+setuptools==80.10.2
