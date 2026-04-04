@@ -50,16 +50,30 @@ INSTALLED_APPS = [
 ]
 ASGI_APPLICATION = "trading_system.asgi.application"
 
+import logging as _logging
+
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
+try:
+    import redis as _redis_client
+    _r = _redis_client.from_url(REDIS_URL, socket_connect_timeout=2)
+    _r.ping()
+    _r.close()
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
         },
-    },
-}
+    }
+except Exception as _exc:
+    _logging.warning("Redis unavailable (%s); falling back to InMemoryChannelLayer", _exc)
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

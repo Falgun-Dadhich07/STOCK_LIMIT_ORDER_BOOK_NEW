@@ -535,7 +535,7 @@ def get_buy_orders(request):
             order_mode='LIMIT',
             price__isnull=False,
             is_matched=False,
-        ).values('user','price','disclosed', 'is_matched', 'id','is_ioc','quantity','original_quantity')
+        ).order_by('-price').values('user','price','disclosed', 'is_matched', 'id','is_ioc','quantity','original_quantity')
         return JsonResponse({'buy_orders': list(buy_orders)})
 
 def get_sell_orders(request):
@@ -545,7 +545,7 @@ def get_sell_orders(request):
             order_mode='LIMIT',
             price__isnull=False,
             is_matched=False,
-        ).values('user','price','disclosed', 'is_matched','id','is_ioc','quantity','original_quantity')
+        ).order_by('price').values('user','price','disclosed', 'is_matched','id','is_ioc','quantity','original_quantity')
         return JsonResponse({'sell_orders': list(sell_orders)})
 
 def get_recent_trades(request):
