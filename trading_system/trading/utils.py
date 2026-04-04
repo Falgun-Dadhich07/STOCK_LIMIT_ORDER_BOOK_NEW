@@ -3,6 +3,9 @@ from django.utils import timezone
 from .models import Order, Trade
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def match_order(new_order):   
@@ -239,9 +242,6 @@ def match_order(new_order):
                 new_order.is_matched=True
                 new_order.save()
                 broadcast_orderbook_update()
-                print("Incomplete order Placed")
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 
 def broadcast_orderbook_update():
     from .models import Order, Trade
@@ -275,12 +275,14 @@ def broadcast_orderbook_update():
         'buy_orders': [
             {
                 'price': float(o.price),
+                'quantity': o.quantity,
                 'disclosed': o.disclosed,
             } for o in buy_orders
         ],
         'sell_orders': [
             {
                 'price': float(o.price),
+                'quantity': o.quantity,
                 'disclosed': o.disclosed,
             } for o in sell_orders
         ],
@@ -295,14 +297,16 @@ def broadcast_orderbook_update():
         ]
     }
 
-
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        'orderbook_group',
-        {
-            'type': 'send_order_update',
-            'payload': payload,
-        }
-    )
-    print("Orderbook updated and broadcasted")
-    # return payload
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                'orderbook_group',
+                {
+                    'type': 'send_order_update',
+                    'payload': payload,
+                }
+            )
+            logger.debug("Orderbook updated and broadcasted")
+    except Exception as e:
+        logger.warning("WebSocket broadcast failed (non-fatal): %s", e)

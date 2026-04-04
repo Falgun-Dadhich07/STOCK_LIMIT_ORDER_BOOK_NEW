@@ -120,9 +120,9 @@
             <button onclick="downloadBuyOrdersCSV()">Download CSV</button>
           </div>
           <thead>
-            <tr><th>Price</th><th>Quantity</th></tr>
+            <tr><th>Price</th><th>Quantity</th><th>Disclosed</th></tr>
           </thead>
-          <tbody><tr><td colspan="2">Waiting for update...</td></tr></tbody>
+          <tbody><tr><td colspan="3">Waiting for update...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -134,9 +134,9 @@
       <div class="table-responsive">
         <table id="sell-orders">
           <thead>
-            <tr><th>Price</th><th>Quantity</th></tr>
+            <tr><th>Price</th><th>Quantity</th><th>Disclosed</th></tr>
           </thead>
-          <tbody><tr><td colspan="2">Waiting for update...</td></tr></tbody>
+          <tbody><tr><td colspan="3">Waiting for update...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -479,17 +479,61 @@
     if (data.buy_orders) {
       const buyOrdersTable = document.querySelector("#buy-orders tbody");
       buyOrdersTable.innerHTML = "";
+      buyOrdersByPrice = {};
+
+      const grouped = {};
       data.buy_orders.forEach(order => {
-        buyOrdersTable.innerHTML += `<tr><td>${order.price}</td><td>${order.disclosed}</td></tr>`;
+        const price = parseFloat(order.price).toFixed(2);
+        const qty   = parseFloat(order.quantity)  || 0;
+        const disc  = parseFloat(order.disclosed) || 0;
+
+        if (!grouped[price]) grouped[price] = { quantity: 0, disclosed: 0 };
+        grouped[price].quantity  += qty;
+        grouped[price].disclosed += disc;
+
+        if (!buyOrdersByPrice[price]) buyOrdersByPrice[price] = [];
+        buyOrdersByPrice[price].push(order);
       });
+
+      Object.entries(grouped)
+        .sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]))
+        .forEach(([price, { quantity, disclosed }]) => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.innerHTML = `<td>${price}</td><td>${quantity}</td><td>${disclosed}</td>`;
+          tr.addEventListener('click', () => showOrderDetails(price, 'buy'));
+          buyOrdersTable.appendChild(tr);
+        });
     }
 
     if (data.sell_orders) {
       const sellOrdersTable = document.querySelector("#sell-orders tbody");
       sellOrdersTable.innerHTML = "";
+      sellOrdersByPrice = {};
+
+      const grouped = {};
       data.sell_orders.forEach(order => {
-        sellOrdersTable.innerHTML += `<tr><td>${order.price}</td><td>${order.disclosed}</td></tr>`;
+        const price = parseFloat(order.price).toFixed(2);
+        const qty   = parseFloat(order.quantity)  || 0;
+        const disc  = parseFloat(order.disclosed) || 0;
+
+        if (!grouped[price]) grouped[price] = { quantity: 0, disclosed: 0 };
+        grouped[price].quantity  += qty;
+        grouped[price].disclosed += disc;
+
+        if (!sellOrdersByPrice[price]) sellOrdersByPrice[price] = [];
+        sellOrdersByPrice[price].push(order);
       });
+
+      Object.entries(grouped)
+        .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+        .forEach(([price, { quantity, disclosed }]) => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.innerHTML = `<td>${price}</td><td>${quantity}</td><td>${disclosed}</td>`;
+          tr.addEventListener('click', () => showOrderDetails(price, 'sell'));
+          sellOrdersTable.appendChild(tr);
+        });
     }
 
     if (data.trades) {
