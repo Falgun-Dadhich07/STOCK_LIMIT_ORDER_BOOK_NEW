@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+cd /app/trading_system
+
 echo "Running migrations..."
 python manage.py migrate
 
