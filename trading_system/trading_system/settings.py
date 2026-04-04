@@ -10,9 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
-
-import os 
+import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -25,19 +25,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-_vm18btw&3yuori1r=051skw%-yp)j^3de^yvai&i5iqtg2^%z"
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-fallback-dev-key-change-me')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', '0') == '1'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    
-        'daphne',
+    'daphne',
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -51,17 +50,20 @@ INSTALLED_APPS = [
 ]
 ASGI_APPLICATION = "trading_system.asgi.application"
 
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [REDIS_URL],
         },
     },
 }
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -71,14 +73,11 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "trading_system.urls"
-import os
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            BASE_DIR / 'trading' / 'templates',
-            BASE_DIR / 'trading' / 'templates' / 'trading',
-        ],
+        'DIRS': [os.path.join(BASE_DIR, 'trading/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -93,31 +92,56 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "trading_system.asgi.application"
 WSGI_APPLICATION = "trading_system.wsgi.application"
-# AUTH_USER_MODEL = 'trading.User'  # Replace with your actual app name
 
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+#
+# Priority order:
+#   1. DATABASE_URL (Railway PostgreSQL plugin, Heroku, etc.)
+#   2. PGHOST / PGPORT / PGDATABASE / PGUSER / PGPASSWORD (also injected by Railway)
+#   3. Individual DB_* env vars (local dev)
 
-DATABASES = { 'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-        #'OPTIONS': {
-        #    'sslmode': 'require',
-        #}
+_database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+_pghost = os.environ.get('PGHOST') or os.environ.get('RAILWAY_TCP_PROXY_DOMAIN')
+
+if _database_url:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=_database_url,
+            conn_max_age=600,
+        )
     }
-}
+elif _pghost:
+    # Railway also exports individual PG* variables — use them directly
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('PGDATABASE', 'railway'),
+            'USER': os.environ.get('PGUSER', 'postgres'),
+            'PASSWORD': os.environ.get('PGPASSWORD', ''),
+            'HOST': _pghost,
+            'PORT': os.environ.get('PGPORT', '5432'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'trading_platform'),
+            'USER': os.getenv('DB_USER', 'trading_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'password'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    
+
 ]
 
 
@@ -136,22 +160,35 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-LOGIN_REDIRECT_URL = 'role_router'
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
 
-"""
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS', 'http://localhost:8000'
+).split(',')
+
+# Auto-detect Railway public domain for CSRF (Railway injects RAILWAY_PUBLIC_DOMAIN)
+_railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+if _railway_domain:
+    _railway_https = f'https://{_railway_domain}'
+    if _railway_https not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_https)
+    # Also trust the bare hostname (Railway sometimes uses this)
+    _railway_http = f'http://{_railway_domain}'
+    if _railway_http not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_http)
+
+# Email configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.example.com'  # Replace with your SMTP server
-EMAIL_PORT = 587  # Common port for TLS
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'mmtp.iitk.ac.in')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your_email@example.com'  # Replace with your email
-EMAIL_HOST_PASSWORD = 'your_password'  # Replace with your password or app password
-DEFAULT_FROM_EMAIL = 'Your Company <noreply@example.com>'"
-"""
-
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
