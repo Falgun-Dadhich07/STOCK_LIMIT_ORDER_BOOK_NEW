@@ -44,11 +44,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     'trading',
+    'students',
     'channels',
-    'uvicorn',
     'channels_redis',
 ]
-ASGI_APPLICATION = "trading_system.asgi.application"
 
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
 
@@ -167,7 +166,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-LOGIN_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'role_router'
 
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS', 'http://localhost:8000'
