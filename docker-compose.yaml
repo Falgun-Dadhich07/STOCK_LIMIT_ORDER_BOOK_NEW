@@ -14,7 +14,10 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
-      - REDIS_HOST=redis
+      - DB_NAME=trading_platform
+      - DB_USER=falgun
+      - DB_PASSWORD=fuddi@69
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - db
       - redis
